@@ -1,0 +1,272 @@
+[
+  {
+    "id": 1,
+    "nome": "Lucas Silva",
+    "email": "lucas.silva@email.com",
+    "telefone": "+55 68 99911-1001",
+    "cidade": "Rio Branco",
+    "uf": "AC",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Casa térrea no bairro Bosque. Cobertura contra danos elétricos, incêndio e alagamentos."
+  },
+  {
+    "id": 2,
+    "nome": "Mariana Alves",
+    "email": "mariana.alves@email.com",
+    "telefone": "+55 82 99822-2002",
+    "cidade": "Maceió",
+    "uf": "AL",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Restaurante à beira-mar na Pajuçara. Cobertura para equipamentos, responsabilidade civil e vendaval."
+  },
+  {
+    "id": 3,
+    "nome": "Carlos Eduardo",
+    "email": "carlos.eduardo@email.com",
+    "telefone": "+55 96 99733-3003",
+    "cidade": "Macapá",
+    "uf": "AP",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Pick-up de uso misto (urbano e rural) - Placa MCP-1234. Cobertura compreensiva com guincho ilimitado."
+  },
+  {
+    "id": 4,
+    "nome": "Ana Beatriz",
+    "email": "ana.beatriz@email.com",
+    "telefone": "+55 92 99644-4004",
+    "cidade": "Manaus",
+    "uf": "AM",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Galpão logístico no Distrito Industrial. Proteção total para mercadorias, incêndio e lucros cessantes."
+  },
+  {
+    "id": 5,
+    "nome": "Fernanda Lima",
+    "email": "fernanda.lima@email.com",
+    "telefone": "+55 71 99555-5005",
+    "cidade": "Salvador",
+    "uf": "BA",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Apartamento no bairro Pituba. Proteção contra roubo, danos a terceiros e assistência 24h."
+  },
+  {
+    "id": 6,
+    "nome": "Gabriel Costa",
+    "email": "gabriel.costa@email.com",
+    "telefone": "+55 85 99466-6006",
+    "cidade": "Fortaleza",
+    "uf": "CE",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Sedan executivo - Placa FOR-5678. Proteção completa contra colisão, roubo e cobertura de vidros."
+  },
+  {
+    "id": 7,
+    "nome": "Roberto Souza",
+    "email": "roberto.souza@email.com",
+    "telefone": "+55 61 99377-7007",
+    "cidade": "Brasília",
+    "uf": "DF",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Casa em condomínio fechado no Lago Sul. Cobertura ampliada para vendaval, vendaval e impacto de veículos."
+  },
+  {
+    "id": 8,
+    "nome": "Juliana Martins",
+    "email": "juliana.martins@email.com",
+    "telefone": "+55 27 99288-8008",
+    "cidade": "Vitória",
+    "uf": "ES",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Escritório de advocacia na Enseada do Suá. Seguro para equipamentos eletrônicos e incêndio."
+  },
+  {
+    "id": 9,
+    "nome": "Thiago Rocha",
+    "email": "thiago.rocha@email.com",
+    "telefone": "+55 62 99199-9009",
+    "cidade": "Goiânia",
+    "uf": "GO",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "SUV familiar - Placa GYN-9012. Uso predominantemente urbano, seguro total com carro reserva por 30 dias."
+  },
+  {
+    "id": 10,
+    "nome": "Patricia Ribeiro",
+    "email": "patricia.ribeiro@email.com",
+    "telefone": "+55 98 99000-1010",
+    "cidade": "São Luís",
+    "uf": "MA",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Sobrado histórico no Centro. Proteção focada em incêndio, curto-circuito e responsabilidade civil."
+  },
+  {
+    "id": 11,
+    "nome": "Marcelo Nunes",
+    "email": "marcelo.nunes@email.com",
+    "telefone": "+55 65 98911-2020",
+    "cidade": "Cuiabá",
+    "uf": "MT",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Concessionária de máquinas agrícolas. Cobertura para pátio, roubo de equipamentos e danos elétricos."
+  },
+  {
+    "id": 12,
+    "nome": "Camila Barbosa",
+    "email": "camila.barbosa@email.com",
+    "telefone": "+55 67 98822-3030",
+    "cidade": "Campo Grande",
+    "uf": "MS",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Caminhonete 4x4 - Placa CPG-3456. Utilizada em estradas de terra e fazendas da região."
+  },
+  {
+    "id": 13,
+    "nome": "Rodrigo Mendes",
+    "email": "rodrigo.mendes@email.com",
+    "telefone": "+55 31 98733-4040",
+    "cidade": "Belo Horizonte",
+    "uf": "MG",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Apartamento na Savassi. Cobertura para quebra de vidros, vazamento de tubulações e furto."
+  },
+  {
+    "id": 14,
+    "nome": "Diego Moraes",
+    "email": "diego.moraes@email.com",
+    "telefone": "+55 91 92222-3300",
+    "cidade": "Belém",
+    "uf": "PA",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Van de entregas - Placa BEL-4455. Rotas diárias por vias sujeitas a alagamento na Baixada."
+  },
+  {
+    "id": 15,
+    "nome": "Larissa Dias",
+    "email": "larissa.dias@email.com",
+    "telefone": "+55 83 98555-6060",
+    "cidade": "João Pessoa",
+    "uf": "PB",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Pousada na praia de Tambaú. Proteção contratada para vendaval, danos causados por água e incêndio."
+  },
+  {
+    "id": 16,
+    "nome": "Felipe Carvalho",
+    "email": "felipe.carvalho@email.com",
+    "telefone": "+55 41 98466-7070",
+    "cidade": "Curitiba",
+    "uf": "PR",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Hatch compacto - Placa CTB-7890. Seguro contra terceiros com cobertura estendida para granizo."
+  },
+  {
+    "id": 17,
+    "nome": "Renata Freitas",
+    "email": "renata.freitas@email.com",
+    "telefone": "+55 81 98377-8080",
+    "cidade": "Recife",
+    "uf": "PE",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Casa em Boa Viagem. Inclui assistência emergencial 24h para chaveiro, encanador e eletricista."
+  },
+  {
+    "id": 18,
+    "nome": "André Luiz",
+    "email": "andre.luiz@email.com",
+    "telefone": "+55 86 98288-9090",
+    "cidade": "Teresina",
+    "uf": "PI",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Supermercado de bairro. Cobertura para deterioração de mercadorias em ambientes frigorificados."
+  },
+  {
+    "id": 19,
+    "nome": "Vanessa Ramos",
+    "email": "vanessa.ramos@email.com",
+    "telefone": "+55 21 98199-0101",
+    "cidade": "Rio de Janeiro",
+    "uf": "RJ",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Crossover urbano - Placa RIO-2345. Cobertura total contra roubo, furto e colisão em vias expressas."
+  },
+  {
+    "id": 20,
+    "nome": "Bruno Castro",
+    "email": "bruno.castro@email.com",
+    "telefone": "+55 84 98000-1212",
+    "cidade": "Natal",
+    "uf": "RN",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Casa de veraneio em Ponta Negra. Seguro com cobertura para roubo de bens e vendaval."
+  },
+  {
+    "id": 21,
+    "nome": "Gustavo Farias",
+    "email": "gustavo.farias@email.com",
+    "telefone": "+55 51 97911-2323",
+    "cidade": "Porto Alegre",
+    "uf": "RS",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Indústria metalúrgica em Caxias do Sul. Cobertura para máquinas operacionais e responsabilidade civil."
+  },
+  {
+    "id": 22,
+    "nome": "Aline Teixeira",
+    "email": "aline.teixeira@email.com",
+    "telefone": "+55 69 97822-3434",
+    "cidade": "Porto Velho",
+    "uf": "RO",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Caminhão leve - Placa PVH-6789. Utilizado para transporte regional de mercadorias."
+  },
+  {
+    "id": 23,
+    "nome": "Eduardo Paiva",
+    "email": "eduardo.paiva@email.com",
+    "telefone": "+55 95 97733-4545",
+    "cidade": "Boa Vista",
+    "uf": "RR",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Casa no bairro Paraviana. Seguro com cobertura para vendaval, danos elétricos e queda de raios."
+  },
+  {
+    "id": 24,
+    "nome": "Carolina Melo",
+    "email": "carolina.melo@email.com",
+    "telefone": "+55 48 97644-5656",
+    "cidade": "Florianópolis",
+    "uf": "SC",
+    "tipo_seguro": "Residencial",
+    "detalhes_seguro": "Casa na Lagoa da Conceição. Proteção contra vendavais, alagamento e quebra de vidros."
+  },
+  {
+    "id": 25,
+    "nome": "Guilherme Santos",
+    "email": "guilherme.santos@email.com",
+    "telefone": "+55 11 97555-6767",
+    "cidade": "São Paulo",
+    "uf": "SP",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Sedan híbrido - Placa SPO-1122. Seguro compreensivo com cobertura para terceiros e assistências premium."
+  },
+  {
+    "id": 26,
+    "nome": "Daniela Aragão",
+    "email": "daniela.aragao@email.com",
+    "telefone": "+55 79 97466-7878",
+    "cidade": "Aracaju",
+    "uf": "SE",
+    "tipo_seguro": "Empresarial",
+    "detalhes_seguro": "Clínica odontológica no bairro Jardins. Proteção para equipamentos médicos sensíveis e roubo."
+  },
+  {
+    "id": 27,
+    "nome": "Leonardo Vieira",
+    "email": "leonardo.vieira@email.com",
+    "telefone": "+55 63 97377-8989",
+    "cidade": "Palmas",
+    "uf": "TO",
+    "tipo_seguro": "Automóvel",
+    "detalhes_seguro": "Utilitário esportivo - Placa PAL-9988. Utilizado em deslocamentos urbanos e rodoviários."
+  }
+]
