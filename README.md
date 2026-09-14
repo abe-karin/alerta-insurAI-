@@ -122,8 +122,8 @@ ponta a ponta em modo de demonstração.
 * **Linguagem:** Python 3.12+
 * **Orquestração de Agentes:** implementação própria (5 classes de agentes em `main.py`), sem framework externo
 * **API Meteorológica:** API pública de avisos ativos do INMET — `https://apiprevmet3.inmet.gov.br/avisos/ativos`
-* **Modelos de Linguagem (LLM):** Google Gemini (`gemini-2.0-flash`) ou OpenAI (`gpt-4o-mini`), com fallback automático para o gerador local de templates
-* **Bibliotecas:** `requests`, `python-dotenv`, `openai`, `google-generativeai`
+* **Modelos de Linguagem (LLM):** Google Gemini (`gemini-3.6-flash`) ou OpenAI (`gpt-4o-mini`), com fallback automático para o gerador local de templates
+* **Bibliotecas:** `requests`, `python-dotenv`, `google-genai`, `openai`
 * **Testes:** `unittest` (biblioteca padrão)
 * **Interface de Demonstração:** CLI (`argparse`), com saída formatada no terminal
 
@@ -139,7 +139,8 @@ ponta a ponta em modo de demonstração.
 │   └── test_pipeline.py   # Suíte de testes automatizados (29 testes)
 ├── requirements.txt       # Dependências do projeto
 ├── .env.example           # Modelo das variáveis de ambiente (chaves de LLM)
-├── relatorio-tecnico.md   # Relatório técnico do desafio
+├── relatorio-tecnico.md   # Relatório técnico (fonte Markdown)
+├── InsurAi_Desafio5_Relatorio_Tecnico.pdf   # Relatório técnico entregue (PDF)
 ├── LICENSE                # Licença MIT
 └── README.md              # Este arquivo
 ```
