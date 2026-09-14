@@ -207,21 +207,24 @@ Observe que o modelo incorporou dados que só existem no cadastro do segurado (c
 * **Segurado:** Helena Moreira (helena.moreira@email.com / +55 81 98100-0901)
 * **Eventos identificados:** Alagamento / Enxurrada — severidade **CRITICO**
 * **Regra de negócio acionada:** Risco de inundação do imóvel segurado devido a volume de chuva crítico.
-* **Mensagem redigida por:** gerador local de templates
+* **Mensagem redigida por:** Google Gemini (`gemini-flash-latest`)
 
 ```text
-🚨 *ALERTA DE PREVENÇÃO PROATIVA - ALAGAMENTO / ENXURRADA*
+**Alerta de Emergência: Risco Crítico de Alagamento**
 
-Olá, *Helena Moreira*!
-Nossos sistemas de monitoramento identificaram risco iminente de *Alagamento / Enxurrada* na região de *Recife*.
-Identificamos que sua apólice de *Seguro Residencial* possui o seguinte cenário: Risco de inundação do imóvel segurado devido a volume de chuva crítico.
+Olá, Helena. Nossos sistemas meteorológicos identificaram chuvas intensas em Recife (35 mm/h) com risco imediato de alagamento para a sua região em Afogados. 
 
-Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguintes cuidados imediatamente:
-🔹 *1.* Mantenha ralos, calhas e condutores limpos para evitar o acúmulo de água no telhado.
-🔹 *2.* Retire eletrodomésticos sensíveis das tomadas para prevenir queimas devido a descargas elétricas.
-🔹 *3.* Mantenha portas e janelas fechadas e evite proximidade com vidraças durante vendavais.
+A sua segurança e a proteção do seu lar são nossa prioridade agora. Como sua casa é térrea, pedimos que tome estas medidas preventivas imediatamente:
 
-Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
+* **Desligue a chave geral de energia:** Evite curtos-circuitos e garanta a segurança de todos caso a água comece a subir.
+* **Eleve móveis e eletrodomésticos:** Coloque itens de valor e aparelhos eletrônicos sobre suportes, mesas ou em locais mais altos.
+* **Instale barreiras e vede acessos:** Use sacos de areia ou comportas nas portas de entrada e ralos para conter ou atrasar a entrada da água.
+
+Lembre-se: sua apólice Residencial conta com cobertura completa para danos elétricos e por água. Não se arrisque por bens materiais.
+
+Estamos com você. Se precisar de qualquer apoio de emergência, nossa **Assistência 24h está pronta para te atender pelo app ou no telefone 0800-XXX-XXXX.** 
+
+Fique em segurança.
 ```
 
 ### 6.3. Cenário controlado — Chuva intensa — Recife/PE (Seguro Automóvel sem garagem coberta)
@@ -251,21 +254,24 @@ Estamos acompanhando as condições meteorológicas em tempo real. Se precisar d
 * **Segurado:** Ricardo Menezes (ricardo.menezes@email.com / +55 41 98200-0904)
 * **Eventos identificados:** Chuva Forte, Ventos Fortes, Queda de Granizo — severidade **ALTO**
 * **Regra de negócio acionada:** Risco de avarias na lataria e vidros do veículo segurado. Alto risco de queda de galhos/árvores sobre o veículo estacionado.
-* **Mensagem redigida por:** gerador local de templates
+* **Mensagem redigida por:** Google Gemini (`gemini-flash-latest`)
 
 ```text
-🚨 *ALERTA DE PREVENÇÃO PROATIVA - CHUVA FORTE*
+**Alerta Meteorológico: Cuidado com seu veículo nas próximas horas**
 
-Olá, *Ricardo Menezes*!
-Nossos sistemas de monitoramento identificaram risco iminente de *Chuva Forte, Ventos Fortes, Queda de Granizo* na região de *Curitiba*.
-Identificamos que sua apólice de *Seguro Automóvel* possui o seguinte cenário: Risco de avarias na lataria e vidros do veículo segurado. Alto risco de queda de galhos/árvores sobre o veículo estacionado.
+Olá, Ricardo. 
 
-Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguintes cuidados imediatamente:
-🔹 *1.* Busque estacionar seu veículo em garagens cobertas ou locais elevados e seguros.
-🔹 *2.* Evite estacionar abaixo de árvores, postes, redes elétricas ou painéis de publicidade.
-🔹 *3.* Evite trafegar por vias com histórico conhecido de alagamento ou baixa visibilidade.
+Identificamos a aproximação imediata de fortes chuvas (18mm/h), ventos de 45km/h e alto risco de **queda de granizo** em Curitiba. 
 
-Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
+Como a prioridade é a sua segurança e a preservação do seu SUV (placa CWB-0904), recomendamos alguns cuidados rápidos para evitar danos à lataria e aos vidros:
+
+* **Procure abrigo coberto:** Estacione seu veículo em garagem coberta ou estacionamento subterrâneo o quanto antes.
+* **Evite árvores e postes:** Não deixe o carro estacionado próximo a galhos, árvores ou fiações que possam cair com a força do vento.
+* **Espere a tempestade passar:** Se estiver dirigindo no momento da chuva de granizo, reduza a velocidade e busque um local seguro para parar (como um posto de combustível). Evite trafegar com visibilidade reduzida.
+
+Estamos monitorando a situação e ao seu lado para o que precisar. Se houver qualquer imprevisto, nossa **Assistência 24h** está pronta para te atender diretamente pelo aplicativo ou pelo telefone de emergência. 
+
+Fique seguro!
 ```
 
 ### 6.5. Cenário controlado — Vendaval costeiro — Florianópolis/SC (Seguro Empresarial)
@@ -273,21 +279,26 @@ Estamos acompanhando as condições meteorológicas em tempo real. Se precisar d
 * **Segurado:** Marcos Bittencourt (marcos.bittencourt@email.com / +55 48 98300-0906)
 * **Eventos identificados:** Ciclone / Vendaval Forte — severidade **CRITICO**
 * **Regra de negócio acionada:** Risco de destelhamento e danos estruturais no imóvel.
-* **Mensagem redigida por:** gerador local de templates
+* **Mensagem redigida por:** Google Gemini (`gemini-flash-latest`)
 
 ```text
-🚨 *ALERTA DE PREVENÇÃO PROATIVA - CICLONE / VENDAVAL FORTE*
+**Alerta de Segurança Climática | Atenção Imediata**
 
-Olá, *Marcos Bittencourt*!
-Nossos sistemas de monitoramento identificaram risco iminente de *Ciclone / Vendaval Forte* na região de *Florianópolis*.
-Identificamos que sua apólice de *Seguro Empresarial* possui o seguinte cenário: Risco de destelhamento e danos estruturais no imóvel.
+Olá, **Marcos**. 
 
-Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguintes cuidados imediatamente:
-🔹 *1.* Proteja mercadorias e estoques elevados acima do nível do solo para evitar danos de inundação.
-🔹 *2.* Garanta que os sistemas de drenagem do galpão/comércio estejam totalmente desobstruídos.
-🔹 *3.* Reforce coberturas soltas e mantenha equipes operacionais cientes dos procedimentos de segurança.
+Identificamos a aproximação de um ciclone com ventos fortes de **75 km/h** em Florianópolis nas próximas horas. Por estar à beira-mar em Canasvieiras, sua pousada está em uma área de maior exposição a rajadas intensas, com risco de destelhamento e impactos na estrutura.
 
-Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
+A segurança dos seus hóspedes, da sua equipe e do seu patrimônio é nossa prioridade. Por favor, adote estas medidas preventivas agora:
+
+* **Proteja aberturas e coberturas:** Tranque bem todas as portas e janelas externas (especialmente as voltadas para o mar) e verifique se há telhas ou estruturas leves soltas.
+* **Recolha a mobília externa:** Retire ou amarre firmemente mesas, cadeiras de praia, guarda-sóis e ombrelones para evitar que sejam arremessados pelo vento.
+* **Oriente os hóspedes e isole áreas abertas:** Peça que permaneçam nos quartos, longe de janelas de vidro, e suspenda o uso de áreas comuns abertas ou próximas a árvores.
+
+Sua apólice cobre vendaval e destelhamento, e nós estamos com você para garantir que tudo fique bem. 
+
+Se precisar de qualquer suporte de emergência, nossa **Assistência 24h** já está de prontidão. Basta acionar pelo app ou ligar para o nosso canal direto. 
+
+Cuide-se e proteja os seus. Estamos ao seu lado.
 ```
 
 ### 6.6. Cenário controlado — Risco de deslizamento — Rio de Janeiro/RJ (Seguro Residencial em encosta)
