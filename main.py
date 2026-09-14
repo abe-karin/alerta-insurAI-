@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,6 +40,11 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 logger = logging.getLogger("I2A2-Desafio5")
+
+# As bibliotecas HTTP e os SDKs de LLM emitem um log por requisição, o que polui
+# a leitura do fluxo dos agentes. Só interessam os avisos e erros delas.
+for _biblioteca in ("httpx", "httpcore", "urllib3", "google_genai", "openai"):
+    logging.getLogger(_biblioteca).setLevel(logging.WARNING)
 
 # Caminhos resolvidos a partir da pasta do projeto, e não do diretório de trabalho.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -451,7 +457,14 @@ class MessageGeneratorAgent:
     """
     # Modelos de cada provedor, sobrescritíveis por OPENAI_MODEL / GEMINI_MODEL no .env.
     MODELOS_OPENAI = ("gpt-4o-mini",)
-    MODELOS_GEMINI = ("gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash")
+    MODELOS_GEMINI = ("gemini-3.6-flash", "gemini-flash-latest")
+
+    # Espera, em segundos, antes de repetir a chamada quando a API responde 429 (cota por minuto).
+    ESPERAS_APOS_LIMITE = (5,)
+
+    # Após esta sequência de falhas o provedor é considerado indisponível, e o restante da
+    # execução usa o gerador local em vez de insistir em chamadas fadadas a falhar.
+    FALHAS_ATE_DESLIGAR_LLM = 3
 
     def __init__(self, api_provider: str = "auto"):
         self.name = "Agente_Redator_IA"
@@ -460,6 +473,12 @@ class MessageGeneratorAgent:
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self.modelo_em_uso = "template-local"
+        # Motor que de fato redigiu a última mensagem. Difere de `modelo_em_uso` sempre que
+        # o LLM falha e o gerador local assume, e é o valor reportado ao segurado.
+        self.ultimo_motor = "template-local"
+        self.motores_utilizados: Dict[str, int] = {}
+        self._falhas_consecutivas = 0
+        self._llm_desligado = False
 
         # Em "auto" a IA generativa é usada sempre que houver credencial configurada;
         # o gerador local entra apenas quando nenhuma chave está disponível.
@@ -487,6 +506,14 @@ class MessageGeneratorAgent:
                 )
             self.api_provider = "simulation"
             logger.info(f"[{self.name}] Utilizando motor cognitivo interno de simulação (Local Template Generator).")
+
+    def _registrar_motor(self, motor: str, texto: str) -> str:
+        """Marca qual motor produziu o texto, para que a origem seja reportada corretamente."""
+        if motor != "template-local":
+            self._falhas_consecutivas = 0
+        self.ultimo_motor = motor
+        self.motores_utilizados[motor] = self.motores_utilizados.get(motor, 0) + 1
+        return texto
 
     def gerar_comunicacao_preventiva(self, dados_elegibilidade: Dict[str, Any]) -> str:
         """
@@ -522,11 +549,11 @@ class MessageGeneratorAgent:
             "seguradora está ao seu lado caso precise acionar assistência 24h."
         )
 
+        if self._llm_desligado or self.api_provider == "simulation":
+            return self._gerar_simulacao_heuristica(dados_elegibilidade)
         if self.api_provider == "openai":
             return self._chamar_openai(system_prompt, user_content, dados_elegibilidade)
-        if self.api_provider == "gemini":
-            return self._chamar_gemini(system_prompt, user_content, dados_elegibilidade)
-        return self._gerar_simulacao_heuristica(dados_elegibilidade)
+        return self._chamar_gemini(system_prompt, user_content, dados_elegibilidade)
 
     def _chamar_openai(
         self, system_prompt: str, user_prompt: str, dados: Optional[Dict[str, Any]] = None
@@ -544,7 +571,7 @@ class MessageGeneratorAgent:
                 temperature=0.7,
                 max_tokens=400
             )
-            return response.choices[0].message.content.strip()
+            return self._registrar_motor(self.modelo_em_uso, response.choices[0].message.content.strip())
         except Exception as e:
             logger.error(
                 f"[{self.name}] Falha ao gerar a mensagem via OpenAI: {str(e)}. "
@@ -571,27 +598,42 @@ class MessageGeneratorAgent:
             # Sem orçamento de raciocínio: a notificação é curta e o limite de saída
             # precisa ser integralmente destinado ao texto enviado ao segurado.
             thinking_config=types.ThinkingConfig(thinking_budget=0),
+            # O agente não expõe ferramentas ao modelo; desligar a chamada automática
+            # de funções evita uma ida e volta desnecessária a cada requisição.
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
 
         # Percorre os modelos suportados: o primeiro disponível na conta responde.
         candidatos = [self.modelo_em_uso] + [m for m in self.MODELOS_GEMINI if m != self.modelo_em_uso]
         ultimo_erro = None
         for modelo in candidatos:
-            try:
-                resposta = cliente.models.generate_content(
-                    model=modelo, contents=user_prompt, config=configuracao
-                )
-                texto = (resposta.text or "").strip()
-                if not texto:
-                    raise ValueError("resposta vazia do modelo")
-                if str(getattr(resposta.candidates[0], "finish_reason", "STOP")).endswith("MAX_TOKENS"):
-                    raise ValueError("resposta truncada pelo limite de tokens")
-                if modelo != self.modelo_em_uso:
-                    logger.warning(f"[{self.name}] Modelo '{self.modelo_em_uso}' indisponível; usando '{modelo}'.")
-                    self.modelo_em_uso = modelo
-                return texto
-            except Exception as e:
-                ultimo_erro = e
+            for tentativa, espera in enumerate((0,) + self.ESPERAS_APOS_LIMITE):
+                if espera:
+                    time.sleep(espera)
+                try:
+                    resposta = cliente.models.generate_content(
+                        model=modelo, contents=user_prompt, config=configuracao
+                    )
+                    texto = (resposta.text or "").strip()
+                    if not texto:
+                        raise ValueError("resposta vazia do modelo")
+                    if str(getattr(resposta.candidates[0], "finish_reason", "STOP")).endswith("MAX_TOKENS"):
+                        raise ValueError("resposta truncada pelo limite de tokens")
+                    if modelo != self.modelo_em_uso:
+                        logger.warning(f"[{self.name}] Modelo '{self.modelo_em_uso}' indisponível; usando '{modelo}'.")
+                        self.modelo_em_uso = modelo
+                    return self._registrar_motor(modelo, texto)
+                except Exception as e:
+                    ultimo_erro = e
+                    # 429 é limite de requisições por minuto do plano gratuito: vale esperar
+                    # e tentar de novo no mesmo modelo. Os demais erros são definitivos.
+                    if "429" not in str(e) and "RESOURCE_EXHAUSTED" not in str(e):
+                        break
+                    if tentativa < len(self.ESPERAS_APOS_LIMITE):
+                        logger.info(
+                            f"[{self.name}] Limite de requisições atingido em '{modelo}'. "
+                            f"Nova tentativa em {self.ESPERAS_APOS_LIMITE[tentativa]}s."
+                        )
 
         logger.error(
             f"[{self.name}] Falha ao gerar a mensagem via Gemini: {str(ultimo_erro)}. "
@@ -625,11 +667,25 @@ class MessageGeneratorAgent:
         )
         return self._gerar_simulacao_heuristica(dados)
 
+    def _registrar_falha_do_llm(self) -> None:
+        """Abre o disjuntor após falhas seguidas no provedor de IA."""
+        self._falhas_consecutivas += 1
+        if not self._llm_desligado and self._falhas_consecutivas >= self.FALHAS_ATE_DESLIGAR_LLM:
+            self._llm_desligado = True
+            logger.warning(
+                f"[{self.name}] {self._falhas_consecutivas} falhas consecutivas no provedor "
+                f"'{self.api_provider}'. As mensagens restantes sairão do gerador local."
+            )
+
     def _gerar_simulacao_heuristica(self, dados: Dict[str, Any]) -> str:
         """
         Gerador de mensagens local, rico e de alta fidelidade que simula perfeitamente
         o comportamento e o tom de uma IA generativa especializada em prevenção.
         """
+        self.ultimo_motor = "template-local"
+        if self.api_provider != "simulation":
+            self._registrar_falha_do_llm()
+
         if not dados:
             return (
                 "⚠️ [ALERTA DE PREVENÇÃO] Olá! Identificamos condições severas na sua área. "
@@ -682,7 +738,7 @@ class MessageGeneratorAgent:
             f"Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. "
             f"Conte conosco! 🤝"
         )
-        return mensagem
+        return self._registrar_motor("template-local", mensagem)
 
 
 # =====================================================================
@@ -821,7 +877,7 @@ def executar_pipeline_proativo(
 
             # Simulação do envio multicanal
             notificacoes.append(
-                disparador.enviar(segurado, mensagem_final, gerador_mensagem.modelo_em_uso)
+                disparador.enviar(segurado, mensagem_final, gerador_mensagem.ultimo_motor)
             )
 
     resumo = {
@@ -830,6 +886,7 @@ def executar_pipeline_proativo(
         "fonte_de_dados": os.path.basename(ARQUIVO_CENARIOS_DEMO) if modo_demo else DataCollectorAgent.URL_AVISOS_INMET,
         "motor_de_geracao": gerador_mensagem.api_provider,
         "modelo": gerador_mensagem.modelo_em_uso,
+        "mensagens_por_motor": dict(gerador_mensagem.motores_utilizados),
         "cidades_monitoradas": len(cidades_monitorar),
         "cidades_com_evento_climatico": cidades_com_evento,
         "total_notificacoes": len(notificacoes),
@@ -840,6 +897,9 @@ def executar_pipeline_proativo(
     print("🏁 PIPELINE CONCLUÍDO COM SUCESSO!")
     print(f"Fonte de dados meteorológicos: {resumo['fonte_de_dados']}")
     print(f"Motor de geração das mensagens: {resumo['motor_de_geracao']} ({resumo['modelo']})")
+    if resumo["mensagens_por_motor"]:
+        detalhe = ", ".join(f"{motor}: {qtd}" for motor, qtd in resumo["mensagens_por_motor"].items())
+        print(f"Mensagens efetivamente redigidas por: {detalhe}")
     print(f"Total de cidades monitoradas: {resumo['cidades_monitoradas']}")
     print(f"Cidades com evento climático relevante: {len(cidades_com_evento)} {cidades_com_evento if cidades_com_evento else ''}")
     print(f"Total de comunicações preventivas geradas e enviadas: {resumo['total_notificacoes']}")

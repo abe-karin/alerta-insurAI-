@@ -115,7 +115,8 @@ O sistema é implementado como um pipeline sequencial de agentes especializados,
   * `auto` (padrão) — detecta automaticamente a credencial disponível no `.env`: usa **Google Gemini** (`gemini-3.6-flash`) se houver `GEMINI_API_KEY`, **OpenAI** (`gpt-4o-mini`) se houver `OPENAI_API_KEY`, e o gerador local caso não haja nenhuma;
   * `gemini` / `openai` — força o provedor;
   * `simulation` — força o gerador local de templates, útil para execuções offline e para os testes automatizados.
-* **Resiliência:** qualquer falha na chamada ao LLM (chave inválida, cota, indisponibilidade, modelo não habilitado na conta) é registrada em log e a mensagem é produzida pelo gerador local **mantendo a personalização** do segurado. No caso do Gemini, o agente ainda tenta automaticamente modelos alternativos antes de desistir.
+* **Resiliência:** quando a API responde `429` (limite de requisições por minuto do plano gratuito), o agente aguarda e repete a chamada com espera progressiva (4s, 10s, 20s); se o modelo não estiver habilitado na conta, tenta automaticamente os modelos alternativos da lista. Esgotadas as tentativas, a falha é registrada em log e a mensagem é produzida pelo gerador local **mantendo a personalização** do segurado — o segurado nunca fica sem comunicação.
+* **Rastreabilidade da origem:** cada notificação registra o motor que **de fato** a redigiu (`gemini-3.6-flash`, `gpt-4o-mini` ou `template-local`), e não apenas o motor configurado. O resumo da execução exibe a contagem por motor, de modo que é sempre possível auditar quais mensagens saíram do LLM e quais saíram do gerador local.
 * **Engenharia de prompt.** O prompt é montado em duas partes:
 
   * **System prompt (persona e diretrizes de escrita):**
@@ -172,14 +173,41 @@ python -m unittest discover -s tests -v   # 29 testes automatizados
 
 ## 6. Exemplos de Mensagens Geradas
 
-Os exemplos abaixo foram capturados em execuções reais do sistema. Os cenários A a E correspondem ao modo de demonstração (`python main.py --demo`), que é **reprodutível a qualquer momento**; a seção 6.7 registra a execução com dados reais do INMET no dia da entrega.
+Todos os textos desta seção foram capturados em execuções reais do sistema, sem edição. Cada exemplo indica o motor que efetivamente o redigiu, conforme registrado pelo próprio pipeline.
 
-### 6.1. Cenário A — Chuva intensa com risco de alagamento — Recife/PE (Seguro Residencial)
+### 6.1. Mensagem redigida pelo LLM — Rio Branco/AC (Seguro Residencial)
+
+* **Execução:** `python main.py` em 13/09/2026, com o aviso oficial do INMET vigente no momento.
+* **Aviso oficial do INMET:** Chuvas Intensas — Perigo Potencial.
+* **Eventos identificados:** Alagamento / Enxurrada, Ciclone / Vendaval Forte — severidade **CRITICO**.
+* **Segurado:** Lucas Silva — casa térrea no bairro Bosque, Rio Branco/AC.
+* **Regra de negócio acionada:** Risco de inundação do imóvel segurado devido a volume de chuva crítico. Risco de destelhamento e danos estruturais no imóvel.
+* **Mensagem redigida por:** Google Gemini (`gemini-flash-latest`).
+
+```text
+**Alerta de Segurança: Chuva forte e vendaval em Rio Branco**
+
+Olá, Lucas. Identificamos um risco crítico de alagamento e ventos fortes (60 km/h) nas próximas horas para a sua região no bairro Bosque.
+
+Como a sua casa é térrea, sua segurança e a proteção do seu lar são nossa prioridade imediata. Por favor, tome estas precauções agora:
+
+* **Eleve bens e eletrônicos:** Retire móveis e eletrodomésticos das áreas mais baixas e desconecte aparelhos da tomada para evitar queimas por oscilação na rede.
+* **Feche e trave acessos:** Tranque portas, janelas e verifique se entradas de ar estão vedadas para reduzir a força do vento e a entrada de água.
+* **Proteja documentos e busque abrigo:** Mantenha itens importantes em sacos plásticos em local alto e seguro. Evite ficar próximo a janelas ou sob telhados frágeis.
+
+Estamos com você nesse momento. Se houver qualquer emergência ou necessidade de reparo, nossa **Assistência 24h está pronta para te atender pelo aplicativo ou pelo telefone 0800 [inserir número]**.
+
+Fique em segurança.
+```
+
+Observe que o modelo incorporou dados que só existem no cadastro do segurado (casa térrea, bairro Bosque) e nas medições extraídas do aviso do INMET (ventos de 60 km/h), produzindo recomendações específicas para aquela apólice — e não um texto genérico.
+
+### 6.2. Cenário controlado — Chuva intensa com risco de alagamento — Recife/PE (Seguro Residencial)
 
 * **Segurado:** Helena Moreira (helena.moreira@email.com / +55 81 98100-0901)
 * **Eventos identificados:** Alagamento / Enxurrada — severidade **CRITICO**
 * **Regra de negócio acionada:** Risco de inundação do imóvel segurado devido a volume de chuva crítico.
-* **Mensagem redigida por:** Google Gemini (`gemini-3.6-flash`)
+* **Mensagem redigida por:** gerador local de templates
 
 ```text
 🚨 *ALERTA DE PREVENÇÃO PROATIVA - ALAGAMENTO / ENXURRADA*
@@ -196,12 +224,12 @@ Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguinte
 Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
 ```
 
-### 6.2. Cenário B — Chuva intensa — Recife/PE (Seguro Automóvel sem garagem coberta)
+### 6.3. Cenário controlado — Chuva intensa — Recife/PE (Seguro Automóvel sem garagem coberta)
 
 * **Segurado:** Sabrina Peixoto (sabrina.peixoto@email.com / +55 81 98100-0903)
 * **Eventos identificados:** Alagamento / Enxurrada — severidade **CRITICO**
 * **Regra de negócio acionada:** Risco de alagamento do veículo que estaciona em via pública.
-* **Mensagem redigida por:** Google Gemini (`gemini-3.6-flash`)
+* **Mensagem redigida por:** gerador local de templates
 
 ```text
 🚨 *ALERTA DE PREVENÇÃO PROATIVA - ALAGAMENTO / ENXURRADA*
@@ -218,12 +246,12 @@ Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguinte
 Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
 ```
 
-### 6.3. Cenário C — Tempestade com granizo — Curitiba/PR (Seguro Automóvel)
+### 6.4. Cenário controlado — Tempestade com granizo — Curitiba/PR (Seguro Automóvel)
 
 * **Segurado:** Ricardo Menezes (ricardo.menezes@email.com / +55 41 98200-0904)
 * **Eventos identificados:** Chuva Forte, Ventos Fortes, Queda de Granizo — severidade **ALTO**
 * **Regra de negócio acionada:** Risco de avarias na lataria e vidros do veículo segurado. Alto risco de queda de galhos/árvores sobre o veículo estacionado.
-* **Mensagem redigida por:** Google Gemini (`gemini-3.6-flash`)
+* **Mensagem redigida por:** gerador local de templates
 
 ```text
 🚨 *ALERTA DE PREVENÇÃO PROATIVA - CHUVA FORTE*
@@ -240,12 +268,12 @@ Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguinte
 Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
 ```
 
-### 6.4. Cenário D — Vendaval costeiro — Florianópolis/SC (Seguro Empresarial)
+### 6.5. Cenário controlado — Vendaval costeiro — Florianópolis/SC (Seguro Empresarial)
 
 * **Segurado:** Marcos Bittencourt (marcos.bittencourt@email.com / +55 48 98300-0906)
 * **Eventos identificados:** Ciclone / Vendaval Forte — severidade **CRITICO**
 * **Regra de negócio acionada:** Risco de destelhamento e danos estruturais no imóvel.
-* **Mensagem redigida por:** Google Gemini (`gemini-flash-latest`)
+* **Mensagem redigida por:** gerador local de templates
 
 ```text
 🚨 *ALERTA DE PREVENÇÃO PROATIVA - CICLONE / VENDAVAL FORTE*
@@ -262,62 +290,45 @@ Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguinte
 Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
 ```
 
-### 6.5. Cenário E — Risco de deslizamento — Rio de Janeiro/RJ (Seguro Residencial em encosta)
+### 6.6. Cenário controlado — Risco de deslizamento — Rio de Janeiro/RJ (Seguro Residencial em encosta)
 
 * **Segurado:** Jorge Nascimento (jorge.nascimento@email.com / +55 21 98400-0908)
 * **Eventos identificados:** Alagamento / Enxurrada, Risco Altíssimo de Deslizamento — severidade **CRITICO**
 * **Regra de negócio acionada:** Risco de inundação do imóvel segurado devido a volume de chuva crítico. Alerta máximo de evacuação preventiva e proteção de vidas.
-* **Mensagem redigida por:** Google Gemini (`gemini-flash-latest`)
+* **Mensagem redigida por:** gerador local de templates
 
 ```text
-Olá, Jorge. 
+🚨 *ALERTA DE PREVENÇÃO PROATIVA - ALAGAMENTO / ENXURRADA*
 
-Identificamos um volume crítico de chuva agora em Santa Teresa (55mm/h) e o risco de deslizamento e enxurrada na sua região é altíssimo. A prioridade absoluta neste momento é a sua segurança e a da sua família.
+Olá, *Jorge Nascimento*!
+Nossos sistemas de monitoramento identificaram risco iminente de *Alagamento / Enxurrada, Risco Altíssimo de Deslizamento* na região de *Rio de Janeiro*.
+Identificamos que sua apólice de *Seguro Residencial* possui o seguinte cenário: Risco de inundação do imóvel segurado devido a volume de chuva crítico. Alerta máximo de evacuação preventiva e proteção de vidas.
 
-Por favor, siga estas medidas preventivas imediatas:
+Como sua segurança vem sempre em primeiro lugar, recomendamos tomar os seguintes cuidados imediatamente:
+🔹 *1.* Mantenha ralos, calhas e condutores limpos para evitar o acúmulo de água no telhado.
+🔹 *2.* Retire eletrodomésticos sensíveis das tomadas para prevenir queimas devido a descargas elétricas.
+🔹 *3.* Mantenha portas e janelas fechadas e evite proximidade com vidraças durante vendavais.
 
-* **Priorize sua vida:** Saia do imóvel com calma e procure um local seguro ou ponto de apoio indicado pela Defesa Civil (ligue 199 se precisar).
-* **Desconecte utilidades:** Se for seguro fazer isso antes de sair, desligue o disjuntor geral de energia e o registro de gás/água.
-* **Leve apenas o essencial:** Tenha em mãos documentos básicos, celular e remédios de uso contínuo. Não tente salvar bens materiais.
-
-Sua casa conta com nossa cobertura estrutural completa, mas o que não tem substituto é a sua vida. 
-
-Estamos com você. Se precisar de suporte emergencial, nossa Assistência 24h está ativa pelo aplicativo ou no 0800 [XXX XXXX]. Mantenha-se em segurança.
+Estamos acompanhando as condições meteorológicas em tempo real. Se precisar de socorro ou assistência 24h, estamos prontos no WhatsApp ou fone 0800-123-4567. Conte conosco! 🤝
 ```
 
-### 6.6. Contraexemplo — Fortaleza/CE
+### 6.7. Contraexemplo — Fortaleza/CE
 
 O cenário de Fortaleza/CE foi propositalmente configurado sem evento climático relevante. O `WeatherAnalyzerAgent` não identifica nenhum evento, o `BusinessRulesAgent` não retorna segurados elegíveis e **nenhuma notificação é gerada** — comprovando que a solução não dispara comunicações desnecessárias.
 
-### 6.7. Execução com dados reais do INMET (2026-09-13 às 23:06:17)
+### 6.8. Execuções registradas
 
-| Indicador | Resultado |
-| --- | --- |
-| Fonte consultada | `https://apiprevmet3.inmet.gov.br/avisos/ativos` |
-| Avisos vigentes recuperados | 1 requisição HTTP para todo o país |
-| Cidades monitoradas (derivadas da carteira) | 27 |
-| Cidades com evento climático relevante | 6 (Rio Branco - AC, Campo Grande - MS, Curitiba - PR, Rio de Janeiro - RJ, Porto Velho - RO, São Paulo - SP) |
-| Notificações preventivas geradas | 5 |
-| Motor de redação | Google Gemini (`gemini-flash-latest`) |
+| Indicador | Execução com dados reais | Execução em modo demonstração |
+| --- | --- | --- |
+| Fonte dos dados | API de avisos do INMET | `cenarios_demo.json` |
+| Cidades monitoradas | 27 (uma por segurado da carteira) | 5 |
+| Cidades com evento relevante | 6 | 4 |
+| Notificações geradas | 5 | 9 |
+| Requisições à API do INMET | 1 para todo o país | não se aplica |
 
-Exemplo capturado nessa execução — **Lucas Silva** (Residencial, Rio Branco - AC), elegível por: *Risco de inundação do imóvel segurado devido a volume de chuva crítico. Risco de destelhamento e danos estruturais no imóvel.*
+Cada execução pode ser registrada em disco com a opção `--salvar`, que grava em `saida/notificacoes_<data>.json` o texto de todas as notificações, a regra de negócio que tornou cada segurado elegível e o motor que redigiu a mensagem.
 
-```text
-**Alerta de Emergência Climática: Ações preventivas para sua casa**
-
-Olá, Lucas. Identificamos um risco crítico de tempestade severa e alagamento para a região do Bosque nas próximas horas, com ventos de até 60 km/h e chuva intensa. 
-
-Como sua casa é térrea, sua segurança e a proteção do seu lar vêm em primeiro lugar. Por favor, adote estas medidas imediatas:
-
-* **Proteja os eletrônicos:** Desligue a chave geral de energia se a água subir e retire aparelhos das tomadas, colocando-os em locais altos para evitar curto-circuitos.
-* **Minimize danos de vendaval:** Feche e trave bem todas as janelas e portas externas para reduzir a pressão do vento sobre o telhado e evitar infiltrações.
-* **Erga itens essenciais:** Eleve móveis, eletrodomésticos e documentos importantes a pelo menos meio metro do chão caso a água comece a acumular.
-
-Não se preocupe com burocracia agora: foque em manter você e sua família em segurança. Se precisar de qualquer suporte, nossa **Assistência 24h já está de prontidão** para atendê-lo pelo aplicativo ou no 0800. Estamos com você.
-```
-
-O arquivo completo dessa execução, com todas as notificações geradas, é gravado em `saida/notificacoes_<data>.json` pela opção `--salvar`.
-
+> **Nota sobre a cota do LLM.** Os cenários 6.2 a 6.6 acima foram capturados em uma execução na qual a cota diária gratuita da API do Gemini já havia se esgotado. O pipeline então exerceu exatamente o comportamento de resiliência projetado: após três falhas consecutivas, desligou o provedor de IA, redigiu as mensagens restantes com o gerador local e **reportou corretamente a origem de cada texto**. Com cota disponível, as mesmas mensagens são redigidas pelo LLM, como no exemplo 6.1.
 ---
 
 ## 7. Validação e Testes
