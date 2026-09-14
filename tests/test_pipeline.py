@@ -125,6 +125,25 @@ class TestAgenteAnalisador(unittest.TestCase):
         resultado = self.analisador.analisar_risco(clima(alerta_especial="granizo"))
         self.assertIn("Queda de Granizo", resultado["eventos_detectados"])
 
+    def test_severidade_e_a_do_pior_evento(self):
+        """Um evento ALTO posterior não pode rebaixar um CRITICO já identificado."""
+        chuva_critica_com_granizo = self.analisador.analisar_risco(
+            clima(chuva_1h_mm=45.0, alerta_especial="granizo")
+        )
+        self.assertIn("Alagamento / Enxurrada", chuva_critica_com_granizo["eventos_detectados"])
+        self.assertIn("Queda de Granizo", chuva_critica_com_granizo["eventos_detectados"])
+        self.assertEqual(chuva_critica_com_granizo["nivel_severidade"], "CRITICO")
+
+        chuva_critica_com_vento_alto = self.analisador.analisar_risco(
+            clima(chuva_1h_mm=45.0, velocidade_vento_kmh=45.0)
+        )
+        self.assertEqual(chuva_critica_com_vento_alto["nivel_severidade"], "CRITICO")
+
+        vendaval_com_granizo = self.analisador.analisar_risco(
+            clima(velocidade_vento_kmh=75.0, alerta_especial="granizo")
+        )
+        self.assertEqual(vendaval_com_granizo["nivel_severidade"], "CRITICO")
+
     def test_deslizamento_apenas_em_cidade_com_encostas(self):
         no_rio = self.analisador.analisar_risco(clima(cidade="Rio de Janeiro", chuva_1h_mm=55.0))
         self.assertIn("Risco Altíssimo de Deslizamento", no_rio["eventos_detectados"])

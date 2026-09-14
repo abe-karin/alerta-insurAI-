@@ -273,8 +273,15 @@ class WeatherAnalyzerAgent:
     Agente responsável por interpretar as variáveis brutas do clima
     e identificar eventos climáticos de risco relevantes para seguros.
     """
+    # Da menor para a maior. A severidade do alerta é sempre a do pior evento identificado.
+    ESCALA_SEVERIDADE = ("BAIXO", "MEDIO", "ALTO", "CRITICO")
+
     def __init__(self):
         self.name = "Agente_Analisador"
+
+    def _maior_severidade(self, atual: str, nova: str) -> str:
+        """Eleva a severidade, nunca a rebaixa: um aviso pode disparar várias regras."""
+        return max(atual, nova, key=self.ESCALA_SEVERIDADE.index)
 
     def analisar_risco(self, dados_clima: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -296,28 +303,28 @@ class WeatherAnalyzerAgent:
         # Regra 1: Alagamento / Enchente (Chuvas acima de 30mm/h)
         if chuva >= 30.0:
             eventos_identificados.append("Alagamento / Enxurrada")
-            nivel_severidade = "CRITICO"
+            nivel_severidade = self._maior_severidade(nivel_severidade, "CRITICO")
         elif chuva >= 15.0:
             eventos_identificados.append("Chuva Forte")
-            nivel_severidade = "ALTO"
+            nivel_severidade = self._maior_severidade(nivel_severidade, "ALTO")
 
         # Regra 2: Vendaval / Tempestades (Vento acima de 50 km/h)
         if vento >= 60.0:
             eventos_identificados.append("Ciclone / Vendaval Forte")
-            nivel_severidade = "CRITICO"
+            nivel_severidade = self._maior_severidade(nivel_severidade, "CRITICO")
         elif vento >= 40.0:
             eventos_identificados.append("Ventos Fortes")
-            nivel_severidade = "ALTO"
+            nivel_severidade = self._maior_severidade(nivel_severidade, "ALTO")
 
         # Regra 3: Queda de Granizo (Detectado por alerta especial)
         if "granizo" in descricao or alerta_especial == "granizo":
             eventos_identificados.append("Queda de Granizo")
-            nivel_severidade = "ALTO"
+            nivel_severidade = self._maior_severidade(nivel_severidade, "ALTO")
 
         # Regra 4: Deslizamento de Terra (chuva volumosa em municípios com ocupação em encostas)
         if chuva >= 40.0 and dados_clima["cidade"].strip().lower() in CIDADES_RISCO_DESLIZAMENTO:
             eventos_identificados.append("Risco Altíssimo de Deslizamento")
-            nivel_severidade = "CRITICO"
+            nivel_severidade = self._maior_severidade(nivel_severidade, "CRITICO")
 
         # Compila a análise técnica
         analise_resultado = {

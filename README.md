@@ -111,7 +111,7 @@ A suíte cobre as cinco etapas do pipeline e roda **sem acesso à rede e sem cha
 python -m unittest discover -s tests -v
 ```
 
-São 29 testes que validam a leitura do texto oficial dos avisos do INMET, os limiares de severidade,
+São 30 testes que validam a leitura do texto oficial dos avisos do INMET, os limiares de severidade,
 o cruzamento evento × apólice, a personalização das mensagens, o simulador de envio e uma execução
 ponta a ponta em modo de demonstração.
 

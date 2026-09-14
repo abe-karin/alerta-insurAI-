@@ -166,7 +166,7 @@ pip install -r requirements.txt
 
 python main.py                  # execução real, com os avisos vigentes do INMET
 python main.py --demo --salvar  # demonstração completa e reprodutível, com evidência em saida/
-python -m unittest discover -s tests -v   # 29 testes automatizados
+python -m unittest discover -s tests -v   # 30 testes automatizados
 ```
 
 ---
@@ -344,7 +344,7 @@ Cada execução pode ser registrada em disco com a opção `--salvar`, que grava
 
 ## 7. Validação e Testes
 
-A suíte automatizada (`python -m unittest discover -s tests -v`) executa **29 testes**, sem depender de rede nem de chave de API, cobrindo:
+A suíte automatizada (`python -m unittest discover -s tests -v`) executa **30 testes**, sem depender de rede nem de chave de API, cobrindo:
 
 * **Agente Coletor:** extração de chuva/vento/granizo do texto livre dos avisos do INMET, tolerância a textos sem métricas e uso efetivo do cache.
 * **Agente Analisador:** cada um dos limiares de severidade e a restrição geográfica da regra de deslizamento.
