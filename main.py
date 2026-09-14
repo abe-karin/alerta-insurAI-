@@ -1,9 +1,34 @@
-import os
+"""
+Ferramenta Inteligente para Comunicação Proativa com o Segurado — Desafio 5 (I2A2).
+
+Pipeline multiagente que consulta os avisos meteorológicos oficiais do INMET, identifica
+eventos climáticos de risco, cruza esses eventos com a carteira de segurados e redige
+(via LLM ou gerador local) notificações preventivas personalizadas.
+
+Uso:
+    python main.py                     # execução padrão (dados reais do INMET)
+    python main.py --demo              # cenários controlados (demonstração do fluxo completo)
+    python main.py --provider gemini   # força a geração das mensagens com LLM
+    python main.py --salvar            # grava as notificações geradas em saida/*.json
+"""
+
+import argparse
 import json
 import logging
+import os
 import re
-from typing import List, Dict, Any, Optional
+import sys
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
 from dotenv import load_dotenv
+
+# Os emojis das notificações quebram a execução em terminais cp1252 (padrão do Windows)
+# e ao redirecionar a saída para arquivo. Forçar UTF-8 evita o UnicodeEncodeError.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 load_dotenv()  # carrega variáveis do arquivo .env para o ambiente
 
@@ -15,8 +40,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger("I2A2-Desafio5")
 
-# Nome padrão do arquivo externo de banco de dados de segurados
-ARQUIVO_SEGURADOS = "segurados.json"
+# Caminhos resolvidos a partir da pasta do projeto, e não do diretório de trabalho.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARQUIVO_SEGURADOS = os.path.join(BASE_DIR, "segurados.json")
+ARQUIVO_CENARIOS_DEMO = os.path.join(BASE_DIR, "cenarios_demo.json")
+DIR_SAIDA = os.path.join(BASE_DIR, "saida")
+
+# Regra 4: municípios da carteira com ocupação relevante em encostas, onde chuva volumosa
+# configura risco geotécnico (deslizamento) além do risco de alagamento.
+CIDADES_RISCO_DESLIZAMENTO = {
+    "rio de janeiro", "belo horizonte", "salvador", "recife",
+    "vitória", "florianópolis", "são paulo", "porto alegre",
+}
+
+# Termos usados para identificar, no cadastro do segurado, imóveis em área de encosta.
+TERMOS_AREA_ENCOSTA = ("encosta", "morro", "ladeira", "serra", "aclive", "declive")
 
 # =====================================================================
 # GERENCIADOR DA BASE DE DADOS DE SEGURADOS
@@ -70,9 +108,13 @@ class DataCollectorAgent:
     de Meteorologia), fonte oficial usada pela Defesa Civil e pela imprensa.
     """
     URL_AVISOS_INMET = "https://apiprevmet3.inmet.gov.br/avisos/ativos"
+    TIMEOUT_SEGUNDOS = 15
 
     def __init__(self):
         self.name = "Agente_Coletor"
+        # A API devolve todos os avisos vigentes do país em uma única resposta; o cache
+        # reduz a execução a uma requisição, em vez de uma por cidade da carteira.
+        self._avisos_hoje: Optional[List[Dict[str, Any]]] = None
         logger.info(f"[{self.name}] Inicializado em modo TEMPO REAL (API pública de avisos do INMET).")
 
     def coletar_dados(self, cidade: str, uf: str) -> Dict[str, Any]:
@@ -114,32 +156,50 @@ class DataCollectorAgent:
         Consulta a API pública de avisos ativos do INMET e retorna o aviso de maior
         severidade vigente hoje que cubra o município informado.
         """
-        import requests
         termo_busca = f"{cidade} - {uf}"
-        try:
-            response = requests.get(self.URL_AVISOS_INMET, timeout=10)
-            if response.status_code != 200:
-                logger.error(f"[{self.name}] Erro na chamada à API do INMET ({response.status_code}).")
-                return None
-            avisos_hoje = response.json().get("hoje", [])
-            avisos_relevantes = [
-                aviso for aviso in avisos_hoje
-                if termo_busca in aviso.get("municipios", "")
-            ]
-            if not avisos_relevantes:
-                return None
-            pior_aviso = max(avisos_relevantes, key=lambda a: a.get("id_severidade", 0))
-            logger.info(f"[{self.name}] Aviso oficial do INMET encontrado para {cidade}: {pior_aviso.get('severidade')} - {pior_aviso.get('descricao')}")
-            return {
-                "severidade": pior_aviso.get("severidade"),
-                "descricao": pior_aviso.get("descricao"),
-                "riscos": pior_aviso.get("riscos", []),
-            }
-        except Exception as e:
-            logger.error(f"[{self.name}] Falha ao consultar a API do INMET: {str(e)}")
+        avisos_relevantes = [
+            aviso for aviso in self._obter_avisos_hoje()
+            if termo_busca in aviso.get("municipios", "")
+        ]
+        if not avisos_relevantes:
             return None
 
-    def _extrair_metricas_dos_riscos(self, riscos: List[str]) -> tuple:
+        pior_aviso = max(avisos_relevantes, key=lambda a: a.get("id_severidade", 0))
+        logger.info(
+            f"[{self.name}] Aviso oficial do INMET encontrado para {cidade}: "
+            f"{pior_aviso.get('severidade')} - {pior_aviso.get('descricao')}"
+        )
+        return {
+            "severidade": pior_aviso.get("severidade"),
+            "descricao": pior_aviso.get("descricao"),
+            "riscos": pior_aviso.get("riscos", []),
+        }
+
+    def _obter_avisos_hoje(self) -> List[Dict[str, Any]]:
+        """
+        Baixa uma única vez por execução a lista de avisos vigentes hoje no país e a mantém
+        em cache, evitando repetir a mesma requisição para cada cidade da carteira.
+        """
+        if self._avisos_hoje is not None:
+            return self._avisos_hoje
+
+        try:
+            response = requests.get(self.URL_AVISOS_INMET, timeout=self.TIMEOUT_SEGUNDOS)
+            if response.status_code != 200:
+                logger.error(f"[{self.name}] Erro na chamada à API do INMET ({response.status_code}).")
+                self._avisos_hoje = []
+                return self._avisos_hoje
+            self._avisos_hoje = response.json().get("hoje", [])
+            logger.info(
+                f"[{self.name}] {len(self._avisos_hoje)} aviso(s) meteorológico(s) vigente(s) "
+                f"hoje recuperado(s) do INMET em uma única requisição."
+            )
+        except Exception as e:
+            logger.error(f"[{self.name}] Falha ao consultar a API do INMET: {str(e)}")
+            self._avisos_hoje = []
+        return self._avisos_hoje
+
+    def _extrair_metricas_dos_riscos(self, riscos: List[str]) -> Tuple[float, float, bool]:
         """
         Extrai estimativas conservadoras (piores valores) de chuva e vento a partir do
         texto oficial de riscos do INMET (ex: "Chuva entre 20 e 30 mm/h... ventos (40-60 km/h)").
@@ -151,6 +211,52 @@ class DataCollectorAgent:
         vento_kmh = max(valores_vento) if valores_vento else 0.0
         tem_granizo = "granizo" in texto.lower()
         return chuva_mm, vento_kmh, tem_granizo
+
+
+# =====================================================================
+# VARIANTE DO AGENTE 1 PARA DEMONSTRAÇÃO (DemoDataCollectorAgent)
+# =====================================================================
+class DemoDataCollectorAgent(DataCollectorAgent):
+    """
+    Variante do Agente Coletor usada no modo de demonstração (`python main.py --demo`).
+    Em vez de consultar o INMET, devolve cenários climáticos controlados descritos em
+    `cenarios_demo.json`. Isso garante que o fluxo completo — e os diferentes tipos de
+    mensagem — possa ser demonstrado mesmo em um dia sem avisos ativos no país, sem
+    alterar uma única linha dos demais agentes do pipeline.
+    """
+
+    def __init__(self, cenarios: Dict[str, Dict[str, Any]]):
+        self.name = "Agente_Coletor_Demo"
+        self._avisos_hoje = []
+        self.cenarios = cenarios
+        logger.info(
+            f"[{self.name}] Inicializado em modo DEMONSTRAÇÃO "
+            f"({len(cenarios)} cenários climáticos controlados)."
+        )
+
+    def coletar_dados(self, cidade: str, uf: str) -> Dict[str, Any]:
+        cenario = self.cenarios.get(f"{cidade} - {uf}")
+        if not cenario:
+            logger.info(f"[{self.name}] Nenhum cenário controlado para {cidade}. Clima considerado estável.")
+            return {
+                "status": "sucesso",
+                "cidade": cidade,
+                "temperatura": 24.0,
+                "umidade": 60.0,
+                "velocidade_vento_kmh": 10.0,
+                "chuva_1h_mm": 0.0,
+                "descricao_tempo": "sem avisos meteorológicos ativos",
+                "pressao": 1013.0,
+                "alerta_especial": "",
+            }
+
+        logger.info(
+            f"[{self.name}] Cenário '{cenario.get('nome_cenario', cidade)}' carregado para {cidade} - {uf}."
+        )
+        dados = {chave: valor for chave, valor in cenario.items() if chave != "nome_cenario"}
+        dados["status"] = "sucesso"
+        dados["cidade"] = cidade
+        return dados
 
 
 # =====================================================================
@@ -202,8 +308,8 @@ class WeatherAnalyzerAgent:
             eventos_identificados.append("Queda de Granizo")
             nivel_severidade = "ALTO"
 
-        # Regra 4: Deslizamento de Terra (Condições de chuva volumosa em áreas de encosta)
-        if chuva >= 40.0 and dados_clima["cidade"] == "Rio de Janeiro":
+        # Regra 4: Deslizamento de Terra (chuva volumosa em municípios com ocupação em encostas)
+        if chuva >= 40.0 and dados_clima["cidade"].strip().lower() in CIDADES_RISCO_DESLIZAMENTO:
             eventos_identificados.append("Risco Altíssimo de Deslizamento")
             nivel_severidade = "CRITICO"
 
@@ -261,46 +367,59 @@ class BusinessRulesAgent:
             if segurado["cidade"].lower() != analise_clima["cidade"].lower():
                 continue
 
-            elegivel = False
-            motivo_elegibilidade = ""
+            # Um mesmo aviso pode disparar mais de uma regra (vendaval e granizo, por exemplo);
+            # os motivos são acumulados para que a mensagem cite o quadro completo de risco.
+            motivos_elegibilidade: List[str] = []
 
             # Regras Cruzadas de Apólice e Evento:
             # 1. Alagamento -> Afeta principalmente Seguro Residencial ou Empresarial de rua
             if "Alagamento / Enxurrada" in eventos:
                 if segurado["tipo_seguro"] in ["Residencial", "Empresarial"]:
-                    elegivel = True
-                    motivo_elegibilidade = "Risco de inundação do imóvel segurado devido a volume de chuva crítico."
-                elif segurado["tipo_seguro"] == "Automóvel" and "Não possui garagem coberta" in segurado["detalhes_seguro"]:
-                    # Se for seguro Auto e não tiver garagem coberta, também avisamos
-                    elegivel = True
-                    motivo_elegibilidade = "Risco de alagamento do veículo que estaciona em via pública."
+                    motivos_elegibilidade.append(
+                        "Risco de inundação do imóvel segurado devido a volume de chuva crítico."
+                    )
+                elif segurado["tipo_seguro"] == "Automóvel" and "não possui garagem coberta" in segurado["detalhes_seguro"].lower():
+                    motivos_elegibilidade.append(
+                        "Risco de alagamento do veículo que estaciona em via pública."
+                    )
 
             # 2. Queda de Granizo -> Afeta gravemente apólices de Automóvel e Residencial (telhados)
             if "Queda de Granizo" in eventos:
                 if segurado["tipo_seguro"] == "Automóvel":
-                    elegivel = True
-                    motivo_elegibilidade = "Risco de avarias na lataria e vidros do veículo segurado."
+                    motivos_elegibilidade.append(
+                        "Risco de avarias na lataria e vidros do veículo segurado."
+                    )
                 elif segurado["tipo_seguro"] == "Residencial":
-                    elegivel = True
-                    motivo_elegibilidade = "Risco de quebra de telhados e vidraças do imóvel."
+                    motivos_elegibilidade.append(
+                        "Risco de quebra de telhados e vidraças do imóvel."
+                    )
 
             # 3. Ventos Fortes ou Ciclone -> Afeta Residencial, Empresarial e Automóvel (queda de árvores)
             if "Ciclone / Vendaval Forte" in eventos or "Ventos Fortes" in eventos:
                 if segurado["tipo_seguro"] in ["Residencial", "Empresarial"]:
-                    elegivel = True
-                    motivo_elegibilidade = "Risco de destelhamento e danos estruturais no imóvel."
+                    motivos_elegibilidade.append(
+                        "Risco de destelhamento e danos estruturais no imóvel."
+                    )
                 elif segurado["tipo_seguro"] == "Automóvel":
-                    elegivel = True
-                    motivo_elegibilidade = "Alto risco de queda de galhos/árvores sobre o veículo estacionado."
+                    motivos_elegibilidade.append(
+                        "Alto risco de queda de galhos/árvores sobre o veículo estacionado."
+                    )
 
-            # 4. Deslizamento -> Altamente crítico para residências em encostas
+            # 4. Deslizamento -> Altamente crítico para imóveis em encostas
             if "Risco Altíssimo de Deslizamento" in eventos:
-                if segurado["tipo_seguro"] == "Residencial" and "encosta" in segurado["detalhes_seguro"].lower():
-                    elegivel = True
-                    motivo_elegibilidade = "Alerta máximo de evacuação preventiva e proteção de vidas."
+                detalhes = segurado.get("detalhes_seguro", "").lower()
+                if segurado["tipo_seguro"] in ["Residencial", "Empresarial"] and any(
+                    termo in detalhes for termo in TERMOS_AREA_ENCOSTA
+                ):
+                    motivos_elegibilidade.append(
+                        "Alerta máximo de evacuação preventiva e proteção de vidas."
+                    )
 
-            if elegivel:
-                # Criamos um payload unificado com as informações do segurado, os dados do evento e o contexto
+            if motivos_elegibilidade:
+                # Remove repetições preservando a ordem em que as regras dispararam.
+                motivo_elegibilidade = " ".join(dict.fromkeys(motivos_elegibilidade))
+
+                # Payload unificado: cadastro do segurado + contexto do evento climático.
                 segurado_notificar = segurado.copy()
                 segurado_notificar["contexto_alerta"] = {
                     "eventos": eventos,
@@ -330,19 +449,42 @@ class MessageGeneratorAgent:
     Utiliza API real de IA Generativa se configurada, ou um gerador cognitivo
     de alta fidelidade baseado em templates enriquecidos por contexto caso offline.
     """
-    def __init__(self, api_provider: str = "simulation"):
+    # Modelos de cada provedor, sobrescritíveis por OPENAI_MODEL / GEMINI_MODEL no .env.
+    MODELOS_OPENAI = ("gpt-4o-mini",)
+    MODELOS_GEMINI = ("gemini-3.6-flash", "gemini-flash-latest", "gemini-2.5-flash")
+
+    def __init__(self, api_provider: str = "auto"):
         self.name = "Agente_Redator_IA"
-        self.api_provider = api_provider  # "openai", "gemini" ou "simulation"
-        
-        # Carrega chaves de API das variáveis de ambiente caso disponíveis
+
+        # As credenciais vêm exclusivamente do ambiente (.env), nunca do código.
         self.openai_key = os.getenv("OPENAI_API_KEY")
-        self.gemini_key = os.getenv("GEMINI_API_KEY")
+        self.gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        self.modelo_em_uso = "template-local"
+
+        # Em "auto" a IA generativa é usada sempre que houver credencial configurada;
+        # o gerador local entra apenas quando nenhuma chave está disponível.
+        if api_provider == "auto":
+            if self.gemini_key:
+                api_provider = "gemini"
+            elif self.openai_key:
+                api_provider = "openai"
+            else:
+                api_provider = "simulation"
+
+        self.api_provider = api_provider  # "openai", "gemini" ou "simulation"
 
         if self.api_provider == "openai" and self.openai_key:
-            logger.info(f"[{self.name}] Utilizando OpenAI (GPT-4o/GPT-3.5) para geração de mensagens.")
+            self.modelo_em_uso = os.getenv("OPENAI_MODEL", self.MODELOS_OPENAI[0])
+            logger.info(f"[{self.name}] Geração de mensagens via OpenAI ({self.modelo_em_uso}).")
         elif self.api_provider == "gemini" and self.gemini_key:
-            logger.info(f"[{self.name}] Utilizando Google Gemini para geração de mensagens.")
+            self.modelo_em_uso = os.getenv("GEMINI_MODEL", self.MODELOS_GEMINI[0])
+            logger.info(f"[{self.name}] Geração de mensagens via Google Gemini ({self.modelo_em_uso}).")
         else:
+            if self.api_provider in ("openai", "gemini"):
+                logger.warning(
+                    f"[{self.name}] Provedor '{self.api_provider}' solicitado, mas nenhuma chave de API "
+                    f"foi encontrada no ambiente/.env. Revertendo para o gerador local."
+                )
             self.api_provider = "simulation"
             logger.info(f"[{self.name}] Utilizando motor cognitivo interno de simulação (Local Template Generator).")
 
@@ -363,7 +505,7 @@ class MessageGeneratorAgent:
         chuva = alerta["detalhes_clima"]["chuva"]
         vento = alerta["detalhes_clima"]["vento"]
 
-        # Definição da Persona e Diretrizes de Escrita (Engenharia de Prompt)
+        # Persona e diretrizes de escrita aplicadas ao modelo.
         system_prompt = (
             "Você é a inteligência proativa de uma Seguradora de alta confiabilidade. "
             "Seu tom deve ser empático, urgente mas não alarmista, e focado em segurança física e material. "
@@ -381,43 +523,107 @@ class MessageGeneratorAgent:
         )
 
         if self.api_provider == "openai":
-            return self._chamar_openai(system_prompt, user_content)
-        elif self.api_provider == "gemini":
-            return self._chamar_gemini(system_prompt, user_content)
-        else:
-            return self._gerar_simulacao_heuristica(dados_elegibilidade)
+            return self._chamar_openai(system_prompt, user_content, dados_elegibilidade)
+        if self.api_provider == "gemini":
+            return self._chamar_gemini(system_prompt, user_content, dados_elegibilidade)
+        return self._gerar_simulacao_heuristica(dados_elegibilidade)
 
-    def _chamar_openai(self, system_prompt: str, user_prompt: str) -> str:
+    def _chamar_openai(
+        self, system_prompt: str, user_prompt: str, dados: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Chamada real utilizando a biblioteca oficial 'openai'."""
         try:
             from openai import OpenAI
             client = OpenAI(api_key=self.openai_key)
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.modelo_em_uso,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.7,
-                max_tokens=300
+                max_tokens=400
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            logger.error(f"[{self.name}] Falha ao conectar à API da OpenAI: {str(e)}. Revertendo para gerador local.")
-            return self._gerar_simulacao_heuristica(None)
+            logger.error(
+                f"[{self.name}] Falha ao gerar a mensagem via OpenAI: {str(e)}. "
+                f"Usando o gerador local para não deixar o segurado sem comunicação."
+            )
+            return self._gerar_simulacao_heuristica(dados)
 
-    def _chamar_gemini(self, system_prompt: str, user_prompt: str) -> str:
-        """Chamada real utilizando a biblioteca oficial 'google-generativeai'."""
+    def _chamar_gemini(
+        self, system_prompt: str, user_prompt: str, dados: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Gera a mensagem com o Google Gemini através do SDK oficial google-genai."""
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            prompt_completo = f"{system_prompt}\n\nInstrução:\n{user_prompt}"
-            response = model.generate_content(prompt_completo)
-            return response.text.strip()
-        except Exception as e:
-            logger.error(f"[{self.name}] Falha ao conectar à API do Gemini: {str(e)}. Revertendo para gerador local.")
-            return self._gerar_simulacao_heuristica(None)
+            from google import genai
+            from google.genai import types
+        except ImportError as e:
+            logger.error(f"[{self.name}] Biblioteca 'google-genai' indisponível ({e}). Usando o gerador local.")
+            return self._gerar_simulacao_heuristica(dados)
+
+        cliente = genai.Client(api_key=self.gemini_key)
+        configuracao = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=0.7,
+            max_output_tokens=900,
+            # Sem orçamento de raciocínio: a notificação é curta e o limite de saída
+            # precisa ser integralmente destinado ao texto enviado ao segurado.
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+
+        # Percorre os modelos suportados: o primeiro disponível na conta responde.
+        candidatos = [self.modelo_em_uso] + [m for m in self.MODELOS_GEMINI if m != self.modelo_em_uso]
+        ultimo_erro = None
+        for modelo in candidatos:
+            try:
+                resposta = cliente.models.generate_content(
+                    model=modelo, contents=user_prompt, config=configuracao
+                )
+                texto = (resposta.text or "").strip()
+                if not texto:
+                    raise ValueError("resposta vazia do modelo")
+                if str(getattr(resposta.candidates[0], "finish_reason", "STOP")).endswith("MAX_TOKENS"):
+                    raise ValueError("resposta truncada pelo limite de tokens")
+                if modelo != self.modelo_em_uso:
+                    logger.warning(f"[{self.name}] Modelo '{self.modelo_em_uso}' indisponível; usando '{modelo}'.")
+                    self.modelo_em_uso = modelo
+                return texto
+            except Exception as e:
+                ultimo_erro = e
+
+        logger.error(
+            f"[{self.name}] Falha ao gerar a mensagem via Gemini: {str(ultimo_erro)}. "
+            f"Usando o gerador local para não deixar o segurado sem comunicação."
+        )
+        return self._gerar_simulacao_heuristica(dados)
+
+        genai.configure(api_key=self.gemini_key)
+        prompt_completo = f"{system_prompt}\n\nInstrução:\n{user_prompt}"
+
+        # Tenta o modelo configurado e, se ele não estiver habilitado na conta, os demais
+        # modelos suportados — evitando que a entrega dependa de um nome de modelo específico.
+        candidatos = [self.modelo_em_uso] + [m for m in self.MODELOS_GEMINI if m != self.modelo_em_uso]
+        ultimo_erro = None
+        for modelo in candidatos:
+            try:
+                resposta = genai.GenerativeModel(modelo).generate_content(prompt_completo)
+                if modelo != self.modelo_em_uso:
+                    logger.warning(
+                        f"[{self.name}] Modelo '{self.modelo_em_uso}' indisponível nesta conta; "
+                        f"utilizando '{modelo}'."
+                    )
+                    self.modelo_em_uso = modelo
+                return resposta.text.strip()
+            except Exception as e:
+                ultimo_erro = e
+
+        logger.error(
+            f"[{self.name}] Falha ao gerar a mensagem via Gemini: {str(ultimo_erro)}. "
+            f"Revertendo para o gerador local (a comunicação nunca deixa de ser enviada)."
+        )
+        return self._gerar_simulacao_heuristica(dados)
 
     def _gerar_simulacao_heuristica(self, dados: Dict[str, Any]) -> str:
         """
@@ -487,7 +693,9 @@ class NotificationSimulator:
     Simulador que demonstra a etapa final da solução (envio de notificações),
     imprimindo os canais e formatos de forma organizada para avaliação e testes.
     """
-    def enviar(self, segurado: Dict[str, Any], mensagem: str):
+    def enviar(
+        self, segurado: Dict[str, Any], mensagem: str, motor: str = "template-local"
+    ) -> Dict[str, Any]:
         print("\n" + "="*80)
         print(f"📡 DISPARO DE NOTIFICAÇÃO PROATIVA - CANAL MULTICHANNEL")
         print("="*80)
@@ -496,73 +704,209 @@ class NotificationSimulator:
         print(f"🏠 Cidade de Risco: {segurado['cidade']} - {segurado['uf']}")
         print(f"📄 Tipo de Seguro: {segurado['tipo_seguro']}")
         print(f"🚨 Severidade do Alerta: {segurado['contexto_alerta']['severidade']}")
+        print(f"🤖 Mensagem redigida por: {motor}")
         print("-"*80)
         print(mensagem)
         print("="*80 + "\n")
+
+        # O registro devolvido alimenta o consolidado da execução gravado por --salvar.
+        return {
+            "segurado": segurado["nome"],
+            "email": segurado["email"],
+            "telefone": segurado["telefone"],
+            "cidade": f"{segurado['cidade']} - {segurado['uf']}",
+            "tipo_seguro": segurado["tipo_seguro"],
+            "eventos": segurado["contexto_alerta"]["eventos"],
+            "severidade": segurado["contexto_alerta"]["severidade"],
+            "regra_de_negocio": segurado["contexto_alerta"]["motivo_regrade_negocio"],
+            "motor_de_geracao": motor,
+            "mensagem": mensagem,
+        }
+
+
+# =====================================================================
+# CENÁRIOS CONTROLADOS PARA DEMONSTRAÇÃO
+# =====================================================================
+def carregar_cenarios_demo() -> Dict[str, Any]:
+    """
+    Carrega os cenários climáticos controlados e a carteira fictícia usados no modo `--demo`.
+    """
+    try:
+        with open(ARQUIVO_CENARIOS_DEMO, "r", encoding="utf-8") as f:
+            demo = json.load(f)
+        logger.info(
+            f"[Database] Cenários de demonstração carregados de '{os.path.basename(ARQUIVO_CENARIOS_DEMO)}' "
+            f"({len(demo.get('cenarios', {}))} cenários / {len(demo.get('segurados', []))} segurados)."
+        )
+        return demo
+    except Exception as e:
+        logger.error(f"[Database] Erro ao carregar os cenários de demonstração: {str(e)}")
+        return {"cenarios": {}, "segurados": []}
 
 
 # =====================================================================
 # ORQUESTRAÇÃO DO FLUXO COMPLETO (Pipeline Principal)
 # =====================================================================
-def executar_pipeline_proativo():
+def executar_pipeline_proativo(
+    provider: str = "auto",
+    modo_demo: bool = False,
+    cidade_filtro: Optional[str] = None,
+    salvar: bool = False,
+) -> Dict[str, Any]:
+    """
+    Executa o fluxo ponta a ponta: coleta → análise → regras de negócio → geração → envio.
+    """
+    modo_texto = "DEMONSTRAÇÃO (cenários controlados)" if modo_demo else "TEMPO REAL (avisos ativos do INMET)"
     print("\n" + "#"*80)
     print("🚀 INICIANDO O SISTEMA DE COMUNICAÇÃO PROATIVA COM SEGURADOS - I2A2 (MVP)")
+    print(f"   Modo de execução: {modo_texto}")
     print("#"*80)
 
-    # 1. Carregando a Base de Dados de Segurados a partir do arquivo JSON separado
-    database_segurados = carregar_base_segurados()
+    # 1. Base de segurados e Agente Coletor (tempo real ou demonstração)
+    if modo_demo:
+        demo = carregar_cenarios_demo()
+        database_segurados = demo.get("segurados", [])
+        coletor = DemoDataCollectorAgent(demo.get("cenarios", {}))
+    else:
+        database_segurados = carregar_base_segurados()
+        coletor = DataCollectorAgent()
 
-    # 2. Instanciando os Agentes
-    coletor = DataCollectorAgent()
+    # 2. Demais agentes do pipeline
     analisador = WeatherAnalyzerAgent()
     decisor = BusinessRulesAgent()
-    gerador_mensagem = MessageGeneratorAgent(api_provider="simulation")
+    gerador_mensagem = MessageGeneratorAgent(api_provider=provider)
     disparador = NotificationSimulator()
 
-    # Cidades monitoradas: derivadas dinamicamente da carteira de segurados carregada,
-    # garantindo que nenhuma cidade presente em segurados.json fique de fora da análise.
-    cidades_monitorar = []
+    # As cidades monitoradas são derivadas da própria carteira, de modo que nenhum
+    # município presente na base fique fora da varredura.
+    cidades_monitorar: List[Tuple[str, str]] = []
     vistas = set()
     for segurado in database_segurados:
+        if cidade_filtro and segurado["cidade"].strip().lower() != cidade_filtro.strip().lower():
+            continue
         chave = (segurado["cidade"], segurado.get("uf"))
         if chave not in vistas:
             vistas.add(chave)
             cidades_monitorar.append(chave)
 
-    total_notificacoes_enviadas = 0
+    if not cidades_monitorar:
+        logger.error(f"Nenhum segurado encontrado na carteira para a cidade '{cidade_filtro}'.")
+
+    notificacoes: List[Dict[str, Any]] = []
+    cidades_com_evento: List[str] = []
 
     # 3. Execução do fluxo coordenado ponta a ponta
     for cidade, uf in cidades_monitorar:
         print(f"\n⚡ [FLUXO] Iniciando varredura para a cidade: {cidade} - {uf}...")
-        
+
         # Etapa 1: Coleta dos Dados Meteorológicos
         dados_clima = coletor.coletar_dados(cidade, uf)
-        
+
         # Etapa 2: Análise de Riscos Climáticos
         analise_risco = analisador.analisar_risco(dados_clima)
-        
-        # Etapa 3: Aplicação de Regras de Negócio utilizando a base de segurados externa
+        if analise_risco.get("requer_comunicacao"):
+            cidades_com_evento.append(f"{cidade} - {uf}")
+
+        # Etapa 3: Aplicação de Regras de Negócio sobre a carteira de segurados
         segurados_para_notificar = decisor.determinar_elegibilidade(analise_risco, database_segurados)
-        
+
         if not segurados_para_notificar:
             print(f"🟢 [FLUXO] Concluído para {cidade}. Nenhuma comunicação preventiva necessária.")
             continue
 
         # Etapa 4 & 5: Geração Automatizada e Simulação de Envio
         for segurado in segurados_para_notificar:
-            # Geração de Mensagem personalizada (com IA real ou simulação)
+            # Redação personalizada pelo LLM ou pelo gerador local
             mensagem_final = gerador_mensagem.gerar_comunicacao_preventiva(segurado)
-            
-            # Simulação do Envio real
-            disparador.enviar(segurado, mensagem_final)
-            total_notificacoes_enviadas += 1
+
+            # Simulação do envio multicanal
+            notificacoes.append(
+                disparador.enviar(segurado, mensagem_final, gerador_mensagem.modelo_em_uso)
+            )
+
+    resumo = {
+        "executado_em": datetime.now().isoformat(timespec="seconds"),
+        "modo": "demonstracao" if modo_demo else "tempo_real",
+        "fonte_de_dados": os.path.basename(ARQUIVO_CENARIOS_DEMO) if modo_demo else DataCollectorAgent.URL_AVISOS_INMET,
+        "motor_de_geracao": gerador_mensagem.api_provider,
+        "modelo": gerador_mensagem.modelo_em_uso,
+        "cidades_monitoradas": len(cidades_monitorar),
+        "cidades_com_evento_climatico": cidades_com_evento,
+        "total_notificacoes": len(notificacoes),
+        "notificacoes": notificacoes,
+    }
 
     print("\n" + "#"*80)
-    print(f"🏁 PIPELINE CONCLUÍDO COM SUCESSO!")
-    print(f"Total de cidades monitoradas: {len(cidades_monitorar)}")
-    print(f"Total de comunicações preventivas geradas e enviadas: {total_notificacoes_enviadas}")
+    print("🏁 PIPELINE CONCLUÍDO COM SUCESSO!")
+    print(f"Fonte de dados meteorológicos: {resumo['fonte_de_dados']}")
+    print(f"Motor de geração das mensagens: {resumo['motor_de_geracao']} ({resumo['modelo']})")
+    print(f"Total de cidades monitoradas: {resumo['cidades_monitoradas']}")
+    print(f"Cidades com evento climático relevante: {len(cidades_com_evento)} {cidades_com_evento if cidades_com_evento else ''}")
+    print(f"Total de comunicações preventivas geradas e enviadas: {resumo['total_notificacoes']}")
     print("#"*80 + "\n")
+
+    if salvar:
+        _salvar_resumo(resumo)
+
+    return resumo
+
+
+def _salvar_resumo(resumo: Dict[str, Any]) -> str:
+    """Grava as notificações geradas em `saida/`, servindo de evidência da execução."""
+    os.makedirs(DIR_SAIDA, exist_ok=True)
+    nome = f"notificacoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    caminho = os.path.join(DIR_SAIDA, nome)
+    with open(caminho, "w", encoding="utf-8") as f:
+        json.dump(resumo, f, ensure_ascii=False, indent=2)
+    logger.info(f"[Saída] Execução registrada em '{os.path.join('saida', nome)}'.")
+    return caminho
+
+
+# =====================================================================
+# INTERFACE DE LINHA DE COMANDO
+# =====================================================================
+def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Comunicação proativa com segurados a partir de eventos climáticos (Desafio 5 - I2A2).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemplos:\n"
+            "  python main.py                       Executa com os avisos reais do INMET\n"
+            "  python main.py --demo                Executa os cenários controlados de demonstração\n"
+            "  python main.py --provider gemini     Redige as mensagens com o Google Gemini\n"
+            "  python main.py --cidade Curitiba     Analisa apenas uma cidade da carteira\n"
+            "  python main.py --demo --salvar       Salva as notificações em saida/*.json\n"
+        ),
+    )
+    parser.add_argument(
+        "--provider",
+        choices=["auto", "openai", "gemini", "simulation"],
+        default="auto",
+        help="Motor de redação das mensagens. 'auto' (padrão) usa o LLM se houver chave no .env.",
+    )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Usa cenários climáticos controlados em vez da API do INMET (demonstração completa).",
+    )
+    parser.add_argument(
+        "--cidade",
+        default=None,
+        help="Restringe a varredura a uma única cidade da carteira.",
+    )
+    parser.add_argument(
+        "--salvar",
+        action="store_true",
+        help="Grava as notificações geradas em saida/notificacoes_<data>.json.",
+    )
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
-    executar_pipeline_proativo()
+    args = _parse_args()
+    executar_pipeline_proativo(
+        provider=args.provider,
+        modo_demo=args.demo,
+        cidade_filtro=args.cidade,
+        salvar=args.salvar,
+    )

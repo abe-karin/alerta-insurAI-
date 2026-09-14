@@ -1,0 +1,157 @@
+{
+  "_descricao": "Cenários climáticos controlados e carteira fictícia usados pelo modo de demonstração (python main.py --demo). Permitem demonstrar o fluxo completo e os diferentes tipos de mensagem mesmo em um dia sem avisos ativos no INMET. O modo padrão (sem --demo) continua consumindo a API pública do INMET em tempo real.",
+  "cenarios": {
+    "Recife - PE": {
+      "nome_cenario": "Chuva intensa com risco de alagamento",
+      "temperatura": 27.0,
+      "umidade": 92.0,
+      "velocidade_vento_kmh": 25.0,
+      "chuva_1h_mm": 35.0,
+      "descricao_tempo": "Aviso oficial INMET: Chuvas Intensas (Perigo)",
+      "pressao": 1006.0,
+      "alerta_especial": ""
+    },
+    "Curitiba - PR": {
+      "nome_cenario": "Tempestade com queda de granizo",
+      "temperatura": 19.0,
+      "umidade": 88.0,
+      "velocidade_vento_kmh": 45.0,
+      "chuva_1h_mm": 18.0,
+      "descricao_tempo": "Aviso oficial INMET: Tempestade com granizo (Perigo Potencial)",
+      "pressao": 1008.0,
+      "alerta_especial": "granizo"
+    },
+    "Florianópolis - SC": {
+      "nome_cenario": "Vendaval costeiro (ventos acima de 70 km/h)",
+      "temperatura": 22.0,
+      "umidade": 78.0,
+      "velocidade_vento_kmh": 75.0,
+      "chuva_1h_mm": 5.0,
+      "descricao_tempo": "Aviso oficial INMET: Ventos Costeiros (Grande Perigo)",
+      "pressao": 1004.0,
+      "alerta_especial": ""
+    },
+    "Rio de Janeiro - RJ": {
+      "nome_cenario": "Chuva volumosa em município com ocupação em encostas",
+      "temperatura": 25.0,
+      "umidade": 95.0,
+      "velocidade_vento_kmh": 30.0,
+      "chuva_1h_mm": 55.0,
+      "descricao_tempo": "Aviso oficial INMET: Acumulado de Chuva (Grande Perigo)",
+      "pressao": 1002.0,
+      "alerta_especial": ""
+    },
+    "Fortaleza - CE": {
+      "nome_cenario": "Tempo estável (contraexemplo: nenhuma notificação deve ser gerada)",
+      "temperatura": 30.0,
+      "umidade": 60.0,
+      "velocidade_vento_kmh": 12.0,
+      "chuva_1h_mm": 0.0,
+      "descricao_tempo": "sem avisos meteorológicos ativos",
+      "pressao": 1013.0,
+      "alerta_especial": ""
+    }
+  },
+  "segurados": [
+    {
+      "id": 901,
+      "nome": "Helena Moreira",
+      "email": "helena.moreira@email.com",
+      "telefone": "+55 81 98100-0901",
+      "cidade": "Recife",
+      "uf": "PE",
+      "tipo_seguro": "Residencial",
+      "detalhes_seguro": "Casa térrea em Afogados, rua com histórico de alagamento. Cobertura para danos por água e danos elétricos."
+    },
+    {
+      "id": 902,
+      "nome": "Otávio Brandão",
+      "email": "otavio.brandao@email.com",
+      "telefone": "+55 81 98100-0902",
+      "cidade": "Recife",
+      "uf": "PE",
+      "tipo_seguro": "Empresarial",
+      "detalhes_seguro": "Loja de materiais elétricos no centro. Estoque armazenado no nível do solo."
+    },
+    {
+      "id": 903,
+      "nome": "Sabrina Peixoto",
+      "email": "sabrina.peixoto@email.com",
+      "telefone": "+55 81 98100-0903",
+      "cidade": "Recife",
+      "uf": "PE",
+      "tipo_seguro": "Automóvel",
+      "detalhes_seguro": "Hatch 1.0 - Placa REC-0903. Não possui garagem coberta no trabalho, estaciona em via pública."
+    },
+    {
+      "id": 904,
+      "nome": "Ricardo Menezes",
+      "email": "ricardo.menezes@email.com",
+      "telefone": "+55 41 98200-0904",
+      "cidade": "Curitiba",
+      "uf": "PR",
+      "tipo_seguro": "Automóvel",
+      "detalhes_seguro": "SUV - Placa CWB-0904. Cobertura compreensiva com proteção de vidros e lataria."
+    },
+    {
+      "id": 905,
+      "nome": "Tatiane Prado",
+      "email": "tatiane.prado@email.com",
+      "telefone": "+55 41 98200-0905",
+      "cidade": "Curitiba",
+      "uf": "PR",
+      "tipo_seguro": "Residencial",
+      "detalhes_seguro": "Sobrado no Água Verde com telhado de fibrocimento e claraboia de vidro."
+    },
+    {
+      "id": 906,
+      "nome": "Marcos Bittencourt",
+      "email": "marcos.bittencourt@email.com",
+      "telefone": "+55 48 98300-0906",
+      "cidade": "Florianópolis",
+      "uf": "SC",
+      "tipo_seguro": "Empresarial",
+      "detalhes_seguro": "Pousada à beira-mar em Canasvieiras. Cobertura para vendaval, destelhamento e lucros cessantes."
+    },
+    {
+      "id": 907,
+      "nome": "Priscila Amorim",
+      "email": "priscila.amorim@email.com",
+      "telefone": "+55 48 98300-0907",
+      "cidade": "Florianópolis",
+      "uf": "SC",
+      "tipo_seguro": "Residencial",
+      "detalhes_seguro": "Casa na Barra da Lagoa com varanda envidraçada voltada para o mar."
+    },
+    {
+      "id": 908,
+      "nome": "Jorge Nascimento",
+      "email": "jorge.nascimento@email.com",
+      "telefone": "+55 21 98400-0908",
+      "cidade": "Rio de Janeiro",
+      "uf": "RJ",
+      "tipo_seguro": "Residencial",
+      "detalhes_seguro": "Casa em encosta no Morro do Estado, Santa Teresa. Cobertura para desmoronamento e danos estruturais."
+    },
+    {
+      "id": 909,
+      "nome": "Beatriz Loureiro",
+      "email": "beatriz.loureiro@email.com",
+      "telefone": "+55 21 98400-0909",
+      "cidade": "Rio de Janeiro",
+      "uf": "RJ",
+      "tipo_seguro": "Empresarial",
+      "detalhes_seguro": "Depósito de bebidas na Tijuca, em rua plana próxima ao canal."
+    },
+    {
+      "id": 910,
+      "nome": "Nilton Bezerra",
+      "email": "nilton.bezerra@email.com",
+      "telefone": "+55 85 98500-0910",
+      "cidade": "Fortaleza",
+      "uf": "CE",
+      "tipo_seguro": "Residencial",
+      "detalhes_seguro": "Apartamento no Meireles. Cenário de controle: nenhum evento climático relevante em curso."
+    }
+  ]
+}

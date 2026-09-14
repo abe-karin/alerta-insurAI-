@@ -132,3 +132,6 @@ secrets.json
 # Operating System Files
 .DS_Store
 Thumbs.db
+
+# Saída gerada pelas execuções do pipeline (--salvar)
+saida/
